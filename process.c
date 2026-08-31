@@ -4,6 +4,7 @@
 #include <dirent.h>
 #include <ctype.h>
 #include <string.h>
+// Defining Process
 struct Process
 {
     int pid;
@@ -12,11 +13,13 @@ struct Process
     char uid[100];
     char gid[100];
 };
+// Defining Uid to count number of occurances
 struct Uid
 {
     int uid;
     int count;
 };
+// To check if its a number or not
 int check(char *a)
 {
     if (*a == '\n')
@@ -36,7 +39,26 @@ int check(char *a)
     }
     return 1;
 }
+// Defining Function to create Tree
+void print_tree(int pid, struct Process pro[], int count, int depth)
+{
+    for (int i = 0; i < count; i++)
+    {
+        if (pro[i].pid == pid)
+        {
 
+            printf("%*s", depth * 2, "");
+            printf("Node: %s depth: %d\n", pro[i].name, depth);
+            for (int j = 0; j < count; j++)
+            {
+                if (pro[j].ppid == pro[i].pid)
+                {
+                    print_tree(pro[j].pid, pro, count, depth + 1);
+                }
+            }
+        }
+    }
+}
 int main()
 {
     DIR *dir = opendir("/proc");
@@ -132,6 +154,7 @@ int main()
     {
         printf("UID: %d Count: %d\n", u[i].uid, u[i].count);
     }
+    print_tree(pro[0].pid, pro, count, 0);
 
     return 0;
 }
