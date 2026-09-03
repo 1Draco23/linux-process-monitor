@@ -163,11 +163,11 @@ int main()
         printf("Gid: %s\n", pro[i].gid);
         int c = atoi(pro[i].uid);
         int found = 0;
-        for (int i = 0; i < ucount; i++)
+        for (int j = 0; i < ucount; j++)
         {
-            if (u[i].uid == c)
+            if (u[j].uid == c)
             {
-                u[i].count++;
+                u[j].count++;
                 found = 1;
             }
         }
