@@ -40,20 +40,48 @@ int check(char *a)
     return 1;
 }
 // Defining Function to create Tree
-void print_tree(int pid, struct Process pro[], int count, int depth)
+void print_tree(int pid, struct Process pro[], int count, int depth, int exists)
 {
+
     for (int i = 0; i < count; i++)
     {
         if (pro[i].pid == pid)
         {
-
-            printf("%*s", depth * 2, "");
-            printf("Node: %s depth: %d\n", pro[i].name, depth);
+            if (depth == 0)
+            {
+                printf("Node: %s depth: %d\n", pro[i].name, depth);
+            }
+            else if (exists)
+            {
+                printf("%*s", depth * 2, "");
+                printf("|----");
+                printf("Node: %s depth: %d\n", pro[i].name, depth);
+            }
+            else
+            {
+                printf("%*s", depth * 2, "");
+                printf("|____");
+                printf("Node: %s depth: %d\n", pro[i].name, depth);
+            }
             for (int j = 0; j < count; j++)
             {
                 if (pro[j].ppid == pro[i].pid)
                 {
-                    print_tree(pro[j].pid, pro, count, depth + 1);
+                    int exists = 0;
+                    for (int k = j + 1; k < count; k++)
+                    {
+                        if (pro[k].ppid == pro[i].pid)
+                        {
+                            exists = 1;
+                            break;
+                        }
+                        else
+                        {
+                            continue;
+                        }
+                    }
+
+                    print_tree(pro[j].pid, pro, count, depth + 1, exists);
                 }
             }
         }
@@ -154,7 +182,7 @@ int main()
     {
         printf("UID: %d Count: %d\n", u[i].uid, u[i].count);
     }
-    print_tree(pro[0].pid, pro, count, 0);
+    print_tree(1, pro, count, 0, 1);
 
     return 0;
 }
