@@ -1,1 +1,18 @@
-"mm.docx" 
+# Compiled binaries
+*.exe
+*.out
+pro
+process
+
+# VS Code
+.vscode/
+
+# Object files
+*.o
+
+# Temporary files
+*.tmp
+*.swp
+
+# Documents / random files
+*.docx
