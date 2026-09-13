@@ -52,6 +52,23 @@ int check(char *a)
     return 1;
 }
 
+void sorting(struct Process pro[], int count)
+{
+    for (int i = 0; i < count; i++)
+    {
+        int max_indx = i;
+        for (int j = i + 1; j < count; j++)
+        {
+            if (pro[j].cpu_usage > pro[max_indx].cpu_usage)
+            {
+                max_indx = j;
+            }
+        }
+        struct Process temp = pro[i];
+        pro[i] = pro[max_indx];
+        pro[max_indx] = temp;
+    }
+}
 // Defining Function to create Tree
 void print_tree(int pid, struct Process pro[], int count, int depth, int exists)
 {
@@ -98,6 +115,43 @@ void print_tree(int pid, struct Process pro[], int count, int depth, int exists)
     }
 }
 
+void filter_pid(int count, struct Process pro[], int pid)
+{
+    printf("%-8s %-20s %-8s %-10s %-10s\n",
+           "PID", "NAME", "STATE", "CPU%", "RSS");
+
+    for (int i = 0; i < count; i++)
+    {
+        if (pro[i].pid == pid)
+        {
+            printf("%-8d %-20s %-8s %-10.2f %-10d\n",
+                   pro[i].pid,
+                   pro[i].name,
+                   pro[i].state,
+                   pro[i].cpu_usage,
+                   pro[i].VmRss);
+        }
+    }
+}
+
+void filter_process(int count, struct Process pro[], char name[])
+{
+    printf("%-8s %-20s %-8s %-10s %-10s\n",
+           "PID", "NAME", "STATE", "CPU%", "RSS");
+    for (int i = 0; i < count; i++)
+    {
+        if (strcmp(pro[i].name, name) == 0)
+        {
+
+            printf("%-8d %-20s %-8s %-10.2f %-10d\n",
+                   pro[i].pid,
+                   pro[i].name,
+                   pro[i].state,
+                   pro[i].cpu_usage,
+                   pro[i].VmRss);
+        }
+    }
+}
 int main()
 {
     DIR *dir = opendir("/proc");
@@ -442,29 +496,32 @@ int main()
                     pro[i].cpu_usage = 0;
                 }
             }
-
+            sorting(pro, count);
             // ==============================
             // PRINT PROCESS INFORMATION
             // ==============================
 
             printf("\nSystem CPU ticks used: %ld\n\n", system_cpu_used);
+            char name[100];
+            printf("Enter name");
+            scanf("%99s", name);
+            filter_process(count, pro, name);
+            int pid;
+            printf("Enter PID: ");
+            scanf("%d", &pid);
 
+            filter_pid(count, pro, pid);
             int ucount = 0;
-
+            printf("%-8s %-20s %-8s %-10s %-10s\n",
+                   "PID", "NAME", "STATE", "CPU%", "RSS");
             for (int i = 0; i < count; i++)
             {
-                printf("PID: %d\n", pro[i].pid);
-                printf("Name: %s\n", pro[i].name);
-                printf("Ppid: %d\n", pro[i].ppid);
-                printf("Uid: %s\n", pro[i].uid);
-                printf("Gid: %s\n", pro[i].gid);
-                printf("State: %s\n", pro[i].state);
-                printf("VmRSS: %d\n", pro[i].VmRss);
-                printf("Utime: %ld\n", pro[i].utime);
-                printf("Stime: %ld\n", pro[i].stime);
-                printf("CPU ticks used: %ld\n", pro[i].cpu_used);
-                printf("CPU Usage: %.2f%%\n", pro[i].cpu_usage);
-
+                printf("%-8d %-20s %-8s %-10.2f %-10d\n",
+                       pro[i].pid,
+                       pro[i].name,
+                       pro[i].state,
+                       pro[i].cpu_usage,
+                       pro[i].VmRss);
                 int c = atoi(pro[i].uid);
                 int found = 0;
 
@@ -495,7 +552,6 @@ int main()
 
             // Print process tree
             print_tree(1, pro, count, 0, 1);
-
             free(old_pro);
             free(pro);
         }
