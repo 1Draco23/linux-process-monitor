@@ -4,6 +4,8 @@
 #include <dirent.h>
 #include <ctype.h>
 #include <string.h>
+#include <unistd.h>
+
 // Defining Process
 struct Process
 {
@@ -16,13 +18,17 @@ struct Process
     int VmRss;
     long utime;
     long stime;
+    long cpu_used;
+    double cpu_usage;
 };
+
 // Defining Uid to count number of occurances
 struct Uid
 {
     int uid;
     int count;
 };
+
 // To check if its a number or not
 int check(char *a)
 {
@@ -30,6 +36,7 @@ int check(char *a)
     {
         return 0;
     }
+
     for (char *b = a; *b != '\0'; b++)
     {
         if (isdigit(*b))
@@ -41,12 +48,13 @@ int check(char *a)
             return 0;
         }
     }
+
     return 1;
 }
+
 // Defining Function to create Tree
 void print_tree(int pid, struct Process pro[], int count, int depth, int exists)
 {
-
     for (int i = 0; i < count; i++)
     {
         if (pro[i].pid == pid)
@@ -67,21 +75,19 @@ void print_tree(int pid, struct Process pro[], int count, int depth, int exists)
                 printf("|____");
                 printf("Node: %s depth: %d\n", pro[i].name, depth);
             }
+
             for (int j = 0; j < count; j++)
             {
                 if (pro[j].ppid == pro[i].pid)
                 {
                     int exists = 0;
+
                     for (int k = j + 1; k < count; k++)
                     {
                         if (pro[k].ppid == pro[i].pid)
                         {
                             exists = 1;
                             break;
-                        }
-                        else
-                        {
-                            continue;
                         }
                     }
 
@@ -91,40 +97,60 @@ void print_tree(int pid, struct Process pro[], int count, int depth, int exists)
         }
     }
 }
+
 int main()
 {
     DIR *dir = opendir("/proc");
+
     if (dir == NULL)
     {
-        perror("Error while opening while");
+        perror("opendir");
     }
     else
     {
-        struct Process *pro = malloc(10 * sizeof(struct Process));
-        int capacity = 10;
-        struct dirent *r;
-        struct Uid u[100];
-        int count = 0;
-        while ((r = readdir(dir)) != NULL)
+        while (1)
         {
-            char path[512];
-            char path2[512];
-            if (check(r->d_name))
-            {
-                snprintf(path, sizeof(path), "/proc/%s/status", r->d_name);
-                snprintf(path2, sizeof(path2), "/proc/%s/stat", r->d_name);
 
-                FILE *f = fopen(path, "r");
-                FILE *f1 = fopen(path2, "r");
-                if (f == NULL || f1 == NULL)
+            struct Process *pro = malloc(10 * sizeof(struct Process));
+            int capacity = 10;
+            struct dirent *r;
+            struct Uid u[100];
+            int count = 0;
+
+            // ==============================
+            // FIRST PROCESS SNAPSHOT
+            // ==============================
+
+            rewinddir(dir);
+
+            while ((r = readdir(dir)) != NULL)
+            {
+                char path[512];
+                char path2[512];
+
+                if (check(r->d_name))
                 {
-                    perror("fopen");
-                }
-                else
-                {
+                    snprintf(path, sizeof(path), "/proc/%s/status", r->d_name);
+                    snprintf(path2, sizeof(path2), "/proc/%s/stat", r->d_name);
+
+                    FILE *f = fopen(path, "r");
+                    FILE *f2 = fopen(path2, "r");
+
+                    if (f == NULL || f2 == NULL)
+                    {
+                        if (f != NULL)
+                            fclose(f);
+
+                        if (f2 != NULL)
+                            fclose(f2);
+
+                        continue;
+                    }
+
+                    // Read CPU information
                     char stat_buffer[1024];
 
-                    if (fgets(stat_buffer, sizeof(stat_buffer), f1) != NULL)
+                    if (fgets(stat_buffer, sizeof(stat_buffer), f2) != NULL)
                     {
                         char *p = strrchr(stat_buffer, ')');
 
@@ -138,26 +164,29 @@ int main()
                             long stime;
 
                             sscanf(p,
-                                   " %c %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld",
+                                   " %c %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld",
                                    &state,
                                    &dummy, &dummy, &dummy, &dummy,
                                    &dummy, &dummy, &dummy, &dummy,
-                                   &dummy, &dummy, &dummy, &dummy,
+                                   &dummy, &dummy,
                                    &utime, &stime);
 
                             pro[count].utime = utime;
                             pro[count].stime = stime;
                         }
                     }
+
+                    // Read process information
                     char buffer[256];
-                    int b = atoi(r->d_name);
-                    pro[count].pid = b;
+
+                    pro[count].pid = atoi(r->d_name);
+
                     while (fgets(buffer, sizeof(buffer), f) != NULL)
                     {
-
                         if (strncmp(buffer, "Name:", 5) == 0)
                         {
                             char result[50];
+
                             if (sscanf(buffer + 5, "%49s", result) == 1)
                             {
                                 strcpy(pro[count].name, result);
@@ -166,6 +195,7 @@ int main()
                         else if (strncmp(buffer, "Uid:", 4) == 0)
                         {
                             char result[50];
+
                             if (sscanf(buffer + 4, "%49s", result) == 1)
                             {
                                 strcpy(pro[count].uid, result);
@@ -174,6 +204,7 @@ int main()
                         else if (strncmp(buffer, "Gid:", 4) == 0)
                         {
                             char result[50];
+
                             if (sscanf(buffer + 4, "%49s", result) == 1)
                             {
                                 strcpy(pro[count].gid, result);
@@ -182,15 +213,16 @@ int main()
                         else if (strncmp(buffer, "PPid:", 5) == 0)
                         {
                             char result[50];
+
                             if (sscanf(buffer + 5, "%49s", result) == 1)
                             {
-                                int a = atoi(result);
-                                pro[count].ppid = a;
+                                pro[count].ppid = atoi(result);
                             }
                         }
                         else if (strncmp(buffer, "State: ", 6) == 0)
                         {
                             char result[50];
+
                             if (sscanf(buffer + 6, "%49s", result) == 1)
                             {
                                 strcpy(pro[count].state, result);
@@ -199,61 +231,275 @@ int main()
                         else if (strncmp(buffer, "VmRSS: ", 6) == 0)
                         {
                             char result[50];
+
                             if (sscanf(buffer + 6, "%49s", result) == 1)
                             {
-                                int a = atoi(result);
-                                pro[count].VmRss = a;
+                                pro[count].VmRss = atoi(result);
                             }
                         }
                     }
+
+                    // Initially zero
+                    pro[count].cpu_used = 0;
+                    pro[count].cpu_usage = 0;
+
                     count++;
+
                     if (count == capacity)
                     {
                         capacity = 2 * capacity;
                         pro = realloc(pro, capacity * sizeof(struct Process));
                     }
+
                     fclose(f);
-                    fclose(f1);
+                    fclose(f2);
                 }
             }
-        }
-        int ucount = 0;
-        for (int i = 0; i < count; i++)
-        {
-            printf("PID: %d\n", pro[i].pid);
-            printf("Name: %s\n", pro[i].name);
-            printf("Ppid: %d\n", pro[i].ppid);
-            printf("Uid: %s\n", pro[i].uid);
-            printf("Gid: %s\n", pro[i].gid);
-            printf("State: %s\n", pro[i].state);
-            printf("VmRSS: %d\n", pro[i].VmRss);
-            printf("Utime: %ld\n", pro[i].utime);
-            printf("Stime: %ld\n", pro[i].stime);
-            int c = atoi(pro[i].uid);
-            int found = 0;
-            for (int j = 0; j < ucount; j++)
+
+            // ==============================
+            // FIRST SYSTEM CPU SNAPSHOT
+            // ==============================
+
+            long old_system_cpu = 0;
+
+            FILE *system_file = fopen("/proc/stat", "r");
+
+            if (system_file != NULL)
             {
-                if (u[j].uid == c)
+                char buffer[1024];
+
+                if (fgets(buffer, sizeof(buffer), system_file) != NULL)
                 {
-                    u[j].count++;
-                    found = 1;
+                    char cpu[10];
+                    long user, nice, system, idle;
+                    long iowait, irq, softirq, steal;
+
+                    sscanf(buffer,
+                           "%s %ld %ld %ld %ld %ld %ld %ld %ld",
+                           cpu,
+                           &user,
+                           &nice,
+                           &system,
+                           &idle,
+                           &iowait,
+                           &irq,
+                           &softirq,
+                           &steal);
+
+                    old_system_cpu =
+                        user + nice + system + idle +
+                        iowait + irq + softirq + steal;
+                }
+
+                fclose(system_file);
+            }
+
+            // Save first process snapshot
+            struct Process *old_pro =
+                malloc(count * sizeof(struct Process));
+
+            for (int i = 0; i < count; i++)
+            {
+                old_pro[i] = pro[i];
+            }
+
+            // ==============================
+            // WAIT 1 SECOND
+            // ==============================
+
+            sleep(1);
+
+            // ==============================
+            // SECOND PROCESS SNAPSHOT
+            // ==============================
+
+            rewinddir(dir);
+
+            while ((r = readdir(dir)) != NULL)
+            {
+                if (check(r->d_name))
+                {
+                    char path2[512];
+
+                    snprintf(path2,
+                             sizeof(path2),
+                             "/proc/%s/stat",
+                             r->d_name);
+
+                    FILE *f2 = fopen(path2, "r");
+
+                    if (f2 != NULL)
+                    {
+                        char stat_buffer[1024];
+
+                        if (fgets(stat_buffer,
+                                  sizeof(stat_buffer),
+                                  f2) != NULL)
+                        {
+                            char *p = strrchr(stat_buffer, ')');
+
+                            if (p != NULL)
+                            {
+                                p++;
+
+                                char state;
+                                long dummy;
+                                long utime;
+                                long stime;
+
+                                sscanf(p,
+                                       " %c %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld",
+                                       &state,
+                                       &dummy, &dummy, &dummy, &dummy,
+                                       &dummy, &dummy, &dummy, &dummy,
+                                       &dummy, &dummy,
+                                       &utime, &stime);
+
+                                int pid = atoi(r->d_name);
+
+                                // Find same PID in old snapshot
+                                for (int i = 0; i < count; i++)
+                                {
+                                    if (old_pro[i].pid == pid)
+                                    {
+                                        long old_cpu =
+                                            old_pro[i].utime +
+                                            old_pro[i].stime;
+
+                                        long new_cpu =
+                                            utime + stime;
+
+                                        pro[i].cpu_used =
+                                            new_cpu - old_cpu;
+
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        fclose(f2);
+                    }
                 }
             }
-            if (!found)
+
+            // ==============================
+            // SECOND SYSTEM CPU SNAPSHOT
+            // ==============================
+
+            long new_system_cpu = 0;
+
+            system_file = fopen("/proc/stat", "r");
+
+            if (system_file != NULL)
             {
-                u[ucount].uid = c;
-                u[ucount].count = 1;
-                ucount++;
+                char buffer[1024];
+
+                if (fgets(buffer, sizeof(buffer), system_file) != NULL)
+                {
+                    char cpu[10];
+                    long user, nice, system, idle;
+                    long iowait, irq, softirq, steal;
+
+                    sscanf(buffer,
+                           "%s %ld %ld %ld %ld %ld %ld %ld %ld",
+                           cpu,
+                           &user,
+                           &nice,
+                           &system,
+                           &idle,
+                           &iowait,
+                           &irq,
+                           &softirq,
+                           &steal);
+
+                    new_system_cpu =
+                        user + nice + system + idle +
+                        iowait + irq + softirq + steal;
+                }
+
+                fclose(system_file);
             }
+
+            // ==============================
+            // CALCULATE CPU %
+            // ==============================
+
+            long system_cpu_used =
+                new_system_cpu - old_system_cpu;
+
+            for (int i = 0; i < count; i++)
+            {
+                if (system_cpu_used > 0)
+                {
+                    pro[i].cpu_usage =
+                        ((double)pro[i].cpu_used /
+                         system_cpu_used) *
+                        100.0;
+                }
+                else
+                {
+                    pro[i].cpu_usage = 0;
+                }
+            }
+
+            // ==============================
+            // PRINT PROCESS INFORMATION
+            // ==============================
+
+            printf("\nSystem CPU ticks used: %ld\n\n", system_cpu_used);
+
+            int ucount = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                printf("PID: %d\n", pro[i].pid);
+                printf("Name: %s\n", pro[i].name);
+                printf("Ppid: %d\n", pro[i].ppid);
+                printf("Uid: %s\n", pro[i].uid);
+                printf("Gid: %s\n", pro[i].gid);
+                printf("State: %s\n", pro[i].state);
+                printf("VmRSS: %d\n", pro[i].VmRss);
+                printf("Utime: %ld\n", pro[i].utime);
+                printf("Stime: %ld\n", pro[i].stime);
+                printf("CPU ticks used: %ld\n", pro[i].cpu_used);
+                printf("CPU Usage: %.2f%%\n", pro[i].cpu_usage);
+
+                int c = atoi(pro[i].uid);
+                int found = 0;
+
+                for (int j = 0; j < ucount; j++)
+                {
+                    if (u[j].uid == c)
+                    {
+                        u[j].count++;
+                        found = 1;
+                    }
+                }
+
+                if (!found)
+                {
+                    u[ucount].uid = c;
+                    u[ucount].count = 1;
+                    ucount++;
+                }
+            }
+
+            // Print UID counts
+            for (int i = 0; i < ucount; i++)
+            {
+                printf("UID: %d Count: %d\n",
+                       u[i].uid,
+                       u[i].count);
+            }
+
+            // Print process tree
+            print_tree(1, pro, count, 0, 1);
+
+            free(old_pro);
+            free(pro);
         }
-        for (int i = 0; i < ucount; i++)
-        {
-            printf("UID: %d Count: %d\n", u[i].uid, u[i].count);
-        }
-        print_tree(1, pro, count, 0, 1);
-        free(pro);
     }
 
-    closedir(dir);
     return 0;
 }
